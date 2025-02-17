@@ -1,6 +1,12 @@
 <script setup>
+import { filter_finish_point_location, filter_finish_point_search, filter_finish_point_suggestions, filter_start_point_location, filter_start_point_search, filter_start_point_suggestions } from '@/service/FromToService';
+import { NodeService } from '@/service/NodeService';
 import axios from 'axios';
-import { ref, onMounted } from 'vue';
+import Column from 'primevue/column';
+import DataTable from 'primevue/datatable';
+import Dialog from 'primevue/dialog';
+
+import { onMounted, ref } from 'vue';
 import * as ol from 'ol';
 import 'ol/ol.css';
 import { Map, View } from 'ol';
@@ -13,35 +19,45 @@ import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import * as olStyle from 'ol/style';
 
-const cargos = ref([]);
-const mapRef = ref(null);
-const markerSVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M12 2a7.008 7.008 0 0 0-7 7c0 5.353 6.036 11.45 6.293 11.707l.707.707.707-.707C12.964 20.45 19 14.353 19 9a7.008 7.008 0 0 0-7-7zm0 16.533C10.471 16.825 7 12.553 7 9a5 5 0 0 1 10 0c0 3.546-3.473 7.823-5 9.533z'/%3E%3Cpath d='M12 6a3 3 0 1 0 3 3 3 3 0 0 0-3-3zm0 4a1 1 0 1 1 1-1 1 1 0 0 1-1 1z'/%3E%3C/svg%3E`;
+const host = 'http://127.0.01';
 
-const userCoordinates = ref([0, 0]); // Координаты пользователя
+const calendarValue = ref(null);
 
-// Получение геолокации
+const selectedTypeBodyNodes = ref(null);
+const selectedTypeBodyNode = ref(null);
+
+const selectADRs = ref(null);
+const selectADR = ref(null);
+const cargos = ref();
+
+const visible = ref(false);
+
+const cargoView = ref(null);
+
+const userCoordinates = ref([0, 0]);
+
 onMounted(() => {
+    NodeService.getTypeBodyNodes().then((data) => (selectedTypeBodyNodes.value = data));
+    NodeService.getADRNodes().then((data) => (selectADRs.value = data));
+
+    // Geolocation to get user's coordinates
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 userCoordinates.value = [position.coords.longitude, position.coords.latitude];
-                console.log("Координаты пользователя:", userCoordinates.value);
                 initializeMap(userCoordinates.value);
             },
             (error) => {
-                console.error("Ошибка геолокации:", error);
+                console.error("Error getting geolocation", error);
             }
         );
-    } else {
-        console.error("Геолокация не поддерживается.");
     }
 });
 
-// Инициализация карты
+// Function to initialize the map with user's coordinates
 function initializeMap(coordinates) {
-    console.log("Создание карты...");
     const map = new Map({
-        target: mapRef.value,
+        target: 'mapContainer',
         layers: [
             new TileLayer({
                 source: new OSM(),
@@ -58,7 +74,6 @@ function initializeMap(coordinates) {
         }),
     });
 
-    // Создание маркера
     const marker = new Feature({
         geometry: new Point(fromLonLat(coordinates)),
     });
@@ -67,11 +82,10 @@ function initializeMap(coordinates) {
         features: [marker],
     });
 
-    // Добавление стиля для маркера
     marker.setStyle(
         new olStyle.Style({
             image: new olStyle.Icon({
-                src: markerSVG,
+                src: 'https://openlayers.org/en/latest/examples/data/icon.png',
                 scale: 0.1,
             }),
         })
@@ -84,94 +98,41 @@ function initializeMap(coordinates) {
     map.addLayer(vectorLayer);
 }
 
-// Получение данных о грузах через API
-const getCargoData = async () => {
-    if (userCoordinates.value[0] === 0 || userCoordinates.value[1] === 0) {
-        console.error("Не удалось получить координаты пользователя.");
-        return;
-    }
+function cargoOpenDetals(event) {
+    console.log(event.data.id);
+    visible.value = true;
+    cargoView.value = event.data.id;
+}
 
-    const form = {
-        user_coordinates: userCoordinates.value,
+function subminForm(event) {
+    let form = {
+        filter_start_point_location: filter_start_point_location.value,
+        filter_finish_point_location: filter_finish_point_location.value,
+        selectedTypeBodyNode: selectedTypeBodyNode.value,
+        calendarValue: calendarValue.value,
+        selectADR: selectADR.value
     };
 
-    console.log("Отправка запроса к API:", form);
-    try {
-        const response = await axios.post('/api/search/cargos', form);
-        console.log("Ответ от API:", response.data);
-        if (response.data && Array.isArray(response.data)) {
+    console.log(JSON.stringify(form));
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, PUT, PATCH, GET, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Origin, X-Api-Key, X-Requested-With, Content-Type, Accept, Authorization'
+    };
+    axios
+        .post(host + '/api/search/cargos', JSON.stringify(form), { headers })
+        .then(function (response) {
+            console.log(response.data);
+            cargos.value = [];
             cargos.value = response.data;
-            updateMapWithCargos(response.data);
-        } else {
-            console.error("Неверные данные:", response.data);
-        }
-    } catch (error) {
-        console.error("Ошибка API:", error);
-    }
-};
-
-// Отображение данных о грузах на карте
-function updateMapWithCargos(data) {
-    console.log("Отображение данных о грузах на карте...", data);
-    const vectorSource = new VectorSource();
-    data.forEach((cargo) => {
-        const marker = new Feature({
-            geometry: new Point(fromLonLat([cargo.longitude, cargo.latitude])),
-            cargoData: cargo,
+        })
+        .catch(function (error) {
+            console.log(error);
         });
-
-        marker.setStyle(
-            new olStyle.Style({
-                image: new olStyle.Icon({
-                    src: markerSVG,
-                    scale: 0.1,
-                }),
-            })
-        );
-
-        vectorSource.addFeature(marker);
-    });
-
-    const vectorLayer = new VectorLayer({
-        source: vectorSource,
-    });
-
-    const map = new Map({
-        target: mapRef.value,
-        layers: [
-            new TileLayer({
-                source: new OSM(),
-            }),
-            vectorLayer,
-        ],
-        view: new View({
-            center: fromLonLat(userCoordinates.value),
-            zoom: 10,
-        }),
-    });
-
-    // Показать popup при клике на маркер
-    vectorLayer.on('click', (event) => {
-        const feature = map.forEachFeatureAtPixel(event.pixel, (feature) => feature);
-        if (feature) {
-            const cargo = feature.get('cargoData');
-            alert(`Cargo ID: ${cargo.id}\nОписание: ${cargo.description}`);
-        }
-    });
-};
-
-// Отправка формы и обновление данных о грузах
-const submitForm = () => {
-    console.log("Форма отправлена.");
-    if (userCoordinates.value[0] === 0 || userCoordinates.value[1] === 0) {
-        console.error("Не удалось получить координаты пользователя.");
-    } else {
-        getCargoData(); // Отправляется новый запрос при отправке формы
-    }
-};
+}
 </script>
-
-
 
 <template>
     <Fluid>
@@ -179,8 +140,8 @@ const submitForm = () => {
             <div class="card flex flex-col gap-4 w-full">
                 <div class="font-semibold text-xl">Поиск грузов</div>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <!-- OpenLayers карта -->
-                    <div ref="mapRef" style="height: 400px; width: 100%"></div>
+                    <!-- Map Container -->
+                    <div id="mapContainer" style="height: 400px; width: 100%"></div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="flex flex-wrap gap-2 w-full">
@@ -196,7 +157,7 @@ const submitForm = () => {
                             placeholder="Введите название населенного пункта"
                             class="w-full"
                             emptySearchMessage="Ничего не найдено."
-                            @option-select="submitForm" 
+                            @option-select="subminForm"
                         />
                     </div>
                     <div class="flex flex-wrap gap-2 w-full">
@@ -211,7 +172,7 @@ const submitForm = () => {
                             placeholder="Введите название населенного пункта"
                             class="w-full"
                             emptySearchMessage="Ничего не найдено."
-                            @option-select="submitForm" 
+                            @option-select="subminForm"
                         />
                     </div>
                 </div>
@@ -219,34 +180,31 @@ const submitForm = () => {
                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="flex flex-wrap gap-2 w-full">
                         <label for="state">Тип кузова</label>
-                        <TreeSelect @change="submitForm" v-model="selectedTypeBodyNode" :options="selectedTypeBodyNodes" selectionMode="checkbox" placeholder="Выбрать" class="w-full"></TreeSelect>
+                        <TreeSelect @change="subminForm" v-model="selectedTypeBodyNode" :options="selectedTypeBodyNodes" selectionMode="checkbox" placeholder="Выбрать" class="w-full"></TreeSelect>
                     </div>
                     <div class="flex flex-wrap gap-2 w-full">
                         <label for="calendarValue">Даты погрузки</label>
-                        <DatePicker @date-select="submitForm" :showIcon="true" selectionMode="range" dateFormat="dd.mm.yy" placeholder="Когда?" :manualInput="false" :showButtonBar="true" class="w-full" v-model="calendarValue"></DatePicker>
+                        <DatePicker @date-select="subminForm" :showIcon="true" selectionMode="range" dateFormat="dd.mm.yy" placeholder="Когда?" :manualInput="false" :showButtonBar="true" class="w-full" v-model="calendarValue"></DatePicker>
                     </div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="flex flex-wrap gap-2 w-full">
                         <label for="lastname2">Опасный груз</label>
-                        <MultiSelect @change="submitForm" v-model="selectADR" :options="selectADRs" optionLabel="name" placeholder="ADR?" :filter="false" :showToggleAll="false" class="w-full"></MultiSelect>
+                        <MultiSelect @change="subminForm" v-model="selectADR" :options="selectADRs" optionLabel="name" placeholder="ADR?" :filter="false" :showToggleAll="false" class="w-full"></MultiSelect>
                     </div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <div class="flex flex-wrap gap-2 w-full">
-                        <Button icon="pi pi-search" @click="submitForm" label="Поиск" />
-                    </div>
+                    <div class="flex flex-wrap gap-2 w-full"><Button icon="pi pi-search" @click="subminForm" label="Поиск" /></div>
                 </div>
             </div>
         </div>
-
         <div class="flex mt-8">
             <div class="card flex flex-col gap-4 w-full">
                 <DataTable v-on:row-click="cargoOpenDetals" selectionMode="single" stripedRows :value="cargos" paginator :rows="5" sortMode="multiple" :rowsPerPageOptions="[5, 10, 20, 50]" tableStyle="min-width: 50rem">
                     <template #header>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="text-xl font-bold">Список грузов</span>
-                            <Button icon="pi pi-refresh" @click="submitForm" rounded raised />
+                            <Button icon="pi pi-refresh" @click="subminForm" rounded raised />
                         </div>
                     </template>
                     <Column field="id" header="Код" sortable> </Column>
@@ -257,7 +215,7 @@ const submitForm = () => {
             </div>
         </div>
 
-        <Dialog v-model:visible="visible" maximizable modal header="Детали груза" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+        <Dialog v-model:visible="visible" maximizable modal header="Header" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
             <p class="m-0">
                 {{ cargoView }}
             </p>
@@ -265,18 +223,9 @@ const submitForm = () => {
     </Fluid>
 </template>
 
-
 <style scoped>
-.logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-    transition: filter 300ms;
-}
-.logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-    filter: drop-shadow(0 0 2em #42b883aa);
+#mapContainer {
+    height: 400px;
+    width: 100%;
 }
 </style>
