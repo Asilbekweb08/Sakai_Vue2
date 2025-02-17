@@ -100,8 +100,12 @@ function initializeMap(coordinates) {
         map.getView().setCenter(clickedCoordinates);
         map.getView().setZoom(15);
     });
+
+    // Call loadGeoJSON to add features from GeoJSON
+    loadGeoJSON(vectorSource);
 }
 
+// Function to reverse geocode the coordinates to an address
 function reverseGeocode(coordinates) {
     axios
         .get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coordinates[1]}&lon=${coordinates[0]}`)
@@ -145,34 +149,35 @@ function subminForm(event) {
         });
 }
 
-function loadGeoJSON() {
-    axios.get(host + '/api/search/cargos')  
+// Function to load GeoJSON and add it to the map
+function loadGeoJSON(vectorSource) {
+    axios.get(host + '/api/search/cargos')  // Replace with your actual GeoJSON file API endpoint
         .then(response => {
             if (response.data) {
                 const geojsonFormat = new ol.format.GeoJSON();
                 const features = geojsonFormat.readFeatures(response.data, {
-                    featureProjection: 'EPSG:3857',  
+                    featureProjection: 'EPSG:3857',  // Ensure correct map projection
                 });
 
                 features.forEach(feature => {
                     const markerStyle = new olStyle.Style({
                         image: new olStyle.Icon({
-                            src: '/marker.svg',  
-                            scale: 0.05,  
+                            src: '/marker.svg',  // Marker icon
+                            scale: 0.05,  // Adjust scale
                         }),
                     });
                     feature.setStyle(markerStyle);
                     vectorSource.addFeature(feature);
                 });
+
+                console.log('GeoJSON data loaded and added to map');
             }
         })
         .catch(error => {
             console.error("Error loading GeoJSON:", error);
         });
 }
-
 </script>
-
 
 
 
