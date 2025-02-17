@@ -5,7 +5,6 @@ import axios from 'axios';
 import Column from 'primevue/column';
 import DataTable from 'primevue/datatable';
 import Dialog from 'primevue/dialog';
-
 import { onMounted, ref } from 'vue';
 import * as ol from 'ol';
 import 'ol/ol.css';
@@ -22,7 +21,6 @@ import { DragBox } from 'ol/interaction';
 import { Translate } from 'ol/interaction';
 
 const host = 'http://127.0.0.1';
-
 const calendarValue = ref(null);
 const selectedTypeBodyNodes = ref(null);
 const selectedTypeBodyNode = ref(null);
@@ -38,7 +36,6 @@ onMounted(() => {
     NodeService.getTypeBodyNodes().then((data) => (selectedTypeBodyNodes.value = data));
     NodeService.getADRNodes().then((data) => (selectADRs.value = data));
 
-    // Geolocation to get user's coordinates
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -52,8 +49,6 @@ onMounted(() => {
     }
 });
 
-// Function to initialize the map with user's coordinates
-// Function to initialize the map with user's coordinates
 function initializeMap(coordinates) {
     const map = new Map({
         target: 'mapContainer',
@@ -82,12 +77,11 @@ function initializeMap(coordinates) {
         new olStyle.Style({
             image: new olStyle.Icon({
                 src: '/marker.svg',
-                scale: 0.05, // Adjust the size of the marker
+                scale: 0.05, 
             }),
         })
     );
 
-    // Add the initial marker to the vector source
     vectorSource.addFeature(marker);
 
     const vectorLayer = new VectorLayer({
@@ -96,30 +90,23 @@ function initializeMap(coordinates) {
 
     map.addLayer(vectorLayer);
 
-    // Create a Click interaction to place a marker
     map.on('click', function (event) {
         const clickedCoordinates = event.coordinate;
         const newCoordinates = toLonLat(clickedCoordinates);
 
-        // Update the position of the marker on the second click
         marker.setGeometry(new Point(clickedCoordinates));
-
-        // Reverse geocode the clicked coordinates
         reverseGeocode(newCoordinates);
 
-        // Optionally, zoom into the clicked location
         map.getView().setCenter(clickedCoordinates);
-        map.getView().setZoom(15);  // Adjust zoom level as needed
+        map.getView().setZoom(15);
     });
 }
 
-// Function to reverse geocode the coordinates to an address
 function reverseGeocode(coordinates) {
     axios
         .get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coordinates[1]}&lon=${coordinates[0]}`)
         .then((response) => {
             if (response.data && response.data.display_name) {
-                // Update the location input automatically
                 filter_start_point_location.value = response.data.display_name;
             }
         })
@@ -128,9 +115,6 @@ function reverseGeocode(coordinates) {
         });
 }
 
-
-
-// Function to handle form submission
 function subminForm(event) {
     let form = {
         filter_start_point_location: filter_start_point_location.value,
@@ -148,6 +132,7 @@ function subminForm(event) {
         'Access-Control-Allow-Methods': 'POST, PUT, PATCH, GET, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Origin, X-Api-Key, X-Requested-With, Content-Type, Accept, Authorization',
     };
+
     axios
         .post(host + '/api/search/cargos', JSON.stringify(form), { headers })
         .then(function (response) {
@@ -159,7 +144,35 @@ function subminForm(event) {
             console.log(error);
         });
 }
+
+function loadGeoJSON() {
+    axios.get(host + '/api/search/cargos')  
+        .then(response => {
+            if (response.data) {
+                const geojsonFormat = new ol.format.GeoJSON();
+                const features = geojsonFormat.readFeatures(response.data, {
+                    featureProjection: 'EPSG:3857',  
+                });
+
+                features.forEach(feature => {
+                    const markerStyle = new olStyle.Style({
+                        image: new olStyle.Icon({
+                            src: '/marker.svg',  
+                            scale: 0.05,  
+                        }),
+                    });
+                    feature.setStyle(markerStyle);
+                    vectorSource.addFeature(feature);
+                });
+            }
+        })
+        .catch(error => {
+            console.error("Error loading GeoJSON:", error);
+        });
+}
+
 </script>
+
 
 
 
