@@ -1,7 +1,6 @@
 <script setup>
 import FloatingConfigurator from '@/components/FloatingConfigurator.vue';
 import axios from 'axios';
-
 import { ref } from 'vue';
 const email = ref('');
 const password = ref('');
@@ -25,17 +24,10 @@ function subminForm(event) {
         'Access-Control-Allow-Headers': 'Origin, X-Api-Key, X-Requested-With, Content-Type, Accept, Authorization'
     };
     axios
-        .post(host + '/api/auth/login', JSON.stringify(form), { mode: 'no-cors' }, { headers })
+        .post(host + '/api/auth/sign-up', JSON.stringify(form), { mode: 'no-cors' }, { headers })
         .then(function (response) {
             message.value = response.data;
-            if (response.data.status == 'OK') {
-                localStorage.setItem('accessToken', response.data.accessToken);
-                localStorage.setItem('userId', response.data.userId);
-
-                window.location.href = response.data.url;
-            }
-
-            //
+            console.log(message.messages);
         })
         .catch(function (error) {
             console.log(error);
@@ -45,7 +37,6 @@ function subminForm(event) {
 
 <template>
     <FloatingConfigurator />
-
     <div class="bg-surface-50 dark:bg-surface-950 flex items-center justify-center min-h-screen min-w-[100vw] overflow-hidden">
         <div class="flex flex-col items-center justify-center">
             <div style="border-radius: 56px; padding: 0.3rem; background: linear-gradient(180deg, var(--primary-color) 10%, rgba(33, 150, 243, 0) 30%)">
@@ -68,8 +59,8 @@ function subminForm(event) {
                                 />
                             </g>
                         </svg>
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Добро пожаловать в ПраймЛэнд!</div>
-                        <span class="text-muted-color font-medium">Войдите, чтобы продолжить</span>
+                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Регистрация</div>
+                        <span class="text-muted-color font-medium">Зарегистрируйтесь, чтобы продолжить</span>
                     </div>
 
                     <Message class="mt-4 mb-4" v-if="message.status == 'ERROR'" severity="error">{{ message.messages }}</Message>
@@ -87,9 +78,8 @@ function subminForm(event) {
                                 <Checkbox v-model="checked" id="rememberme1" binary class="mr-2"></Checkbox>
                                 <label for="rememberme1">Запомнить меня</label>
                             </div>
-                            <span class="font-medium no-underline ml-2 text-right cursor-pointer text-primary">Забыли пароль?</span>
                         </div>
-                        <Button label="Войти" @click="subminForm" class="w-full" as="router-link" to="/auth/login"></Button>
+                        <Button label="Регистрация" @click="subminForm" class="w-full" as="router-link" to="/auth/sign-up"></Button>
                     </div>
                 </div>
             </div>

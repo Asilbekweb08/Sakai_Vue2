@@ -4,6 +4,7 @@ import { PrimeVueResolver } from '@primevue/auto-import-resolver';
 import vue from '@vitejs/plugin-vue';
 import Components from 'unplugin-vue-components/vite';
 import { defineConfig } from 'vite';
+import dts from 'vite-plugin-dts';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -12,6 +13,7 @@ export default defineConfig({
     },
     plugins: [
         vue(),
+        dts(),
         Components({
             resolvers: [PrimeVueResolver()]
         })
