@@ -15,7 +15,7 @@ import * as olStyle from 'ol/style';
 
 const cargos = ref([]);
 const mapRef = ref(null);
-const markerSVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' display='block' height='41px' width='27px' viewBox='0 0 27 41'%3E%3Cpath fill='%23555' d='M27,13.5C27,19.07 20.25,27 14.75,34.5C14.02,35.5 12.98,35.5 12.25,34.5C6.75,27 0,19.22 0,13.5C0,6.04 6.04,0 13.5,0C20.96,0 27,6.04 27,13.5Z'%3E%3C/path%3E%3Cpath opacity='0.25' d='M13.5,0C6.04,0 0,6.04 0,13.5C0,19.22 6.75,27 12.25,34.5C13,35.52 14.02,35.5 14.75,34.5C20.25,27 27,19.07 27,13.5C27,6.04 20.96,0 13.5,0ZM13.5,1C20.42,1 26,6.58 26,13.5C26,15.9 24.5,19.18 22.22,22.74C19.95,26.3 16.71,30.14 13.94,33.91C13.74,34.18 13.61,34.32 13.5,34.44C13.39,34.32 13.26,34.18 13.06,33.91C10.28,30.13 7.41,26.31 5.02,22.77C2.62,19.23 1,15.95 1,13.5C1,6.58 6.58,1 13.5,1Z'%3E%3C/path%3E%3Ccircle fill='white' cx='13.5' cy='13.5' r='5.5'%3E%3C/circle%3E%3C/svg%3E`;
+const markerSVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M12 2a7.008 7.008 0 0 0-7 7c0 5.353 6.036 11.45 6.293 11.707l.707.707.707-.707C12.964 20.45 19 14.353 19 9a7.008 7.008 0 0 0-7-7zm0 16.533C10.471 16.825 7 12.553 7 9a5 5 0 0 1 10 0c0 3.546-3.473 7.823-5 9.533z'/%3E%3Cpath d='M12 6a3 3 0 1 0 3 3 3 3 0 0 0-3-3zm0 4a1 1 0 1 1 1-1 1 1 0 0 1-1 1z'/%3E%3C/svg%3E`;
 
 const userCoordinates = ref([0, 0]); // Координаты пользователя
 
@@ -86,6 +86,11 @@ function initializeMap(coordinates) {
 
 // Получение данных о грузах через API
 const getCargoData = async () => {
+    if (userCoordinates.value[0] === 0 || userCoordinates.value[1] === 0) {
+        console.error("Не удалось получить координаты пользователя.");
+        return;
+    }
+
     const form = {
         user_coordinates: userCoordinates.value,
     };
@@ -158,9 +163,15 @@ function updateMapWithCargos(data) {
 // Отправка формы и обновление данных о грузах
 const submitForm = () => {
     console.log("Форма отправлена.");
-    getCargoData(); // Отправляется новый запрос при отправке формы
+    if (userCoordinates.value[0] === 0 || userCoordinates.value[1] === 0) {
+        console.error("Не удалось получить координаты пользователя.");
+    } else {
+        getCargoData(); // Отправляется новый запрос при отправке формы
+    }
 };
 </script>
+
+
 
 <template>
     <Fluid>
@@ -168,7 +179,7 @@ const submitForm = () => {
             <div class="card flex flex-col gap-4 w-full">
                 <div class="font-semibold text-xl">Поиск грузов</div>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <!-- OpenLayers xaritasi -->
+                    <!-- OpenLayers карта -->
                     <div ref="mapRef" style="height: 400px; width: 100%"></div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
@@ -185,7 +196,7 @@ const submitForm = () => {
                             placeholder="Введите название населенного пункта"
                             class="w-full"
                             emptySearchMessage="Ничего не найдено."
-                            @option-select="subminForm"
+                            @option-select="submitForm" 
                         />
                     </div>
                     <div class="flex flex-wrap gap-2 w-full">
@@ -200,7 +211,7 @@ const submitForm = () => {
                             placeholder="Введите название населенного пункта"
                             class="w-full"
                             emptySearchMessage="Ничего не найдено."
-                            @option-select="subminForm"
+                            @option-select="submitForm" 
                         />
                     </div>
                 </div>
@@ -208,31 +219,34 @@ const submitForm = () => {
                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="flex flex-wrap gap-2 w-full">
                         <label for="state">Тип кузова</label>
-                        <TreeSelect @change="subminForm" v-model="selectedTypeBodyNode" :options="selectedTypeBodyNodes" selectionMode="checkbox" placeholder="Выбрать" class="w-full"></TreeSelect>
+                        <TreeSelect @change="submitForm" v-model="selectedTypeBodyNode" :options="selectedTypeBodyNodes" selectionMode="checkbox" placeholder="Выбрать" class="w-full"></TreeSelect>
                     </div>
                     <div class="flex flex-wrap gap-2 w-full">
                         <label for="calendarValue">Даты погрузки</label>
-                        <DatePicker @date-select="subminForm" :showIcon="true" selectionMode="range" dateFormat="dd.mm.yy" placeholder="Когда?" :manualInput="false" :showButtonBar="true" class="w-full" v-model="calendarValue"></DatePicker>
+                        <DatePicker @date-select="submitForm" :showIcon="true" selectionMode="range" dateFormat="dd.mm.yy" placeholder="Когда?" :manualInput="false" :showButtonBar="true" class="w-full" v-model="calendarValue"></DatePicker>
                     </div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="flex flex-wrap gap-2 w-full">
                         <label for="lastname2">Опасный груз</label>
-                        <MultiSelect @change="subminForm" v-model="selectADR" :options="selectADRs" optionLabel="name" placeholder="ADR?" :filter="false" :showToggleAll="false" class="w-full"></MultiSelect>
+                        <MultiSelect @change="submitForm" v-model="selectADR" :options="selectADRs" optionLabel="name" placeholder="ADR?" :filter="false" :showToggleAll="false" class="w-full"></MultiSelect>
                     </div>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4">
-                    <div class="flex flex-wrap gap-2 w-full"><Button icon="pi pi-search" @click="subminForm" label="Поиск" /></div>
+                    <div class="flex flex-wrap gap-2 w-full">
+                        <Button icon="pi pi-search" @click="submitForm" label="Поиск" />
+                    </div>
                 </div>
             </div>
         </div>
+
         <div class="flex mt-8">
             <div class="card flex flex-col gap-4 w-full">
                 <DataTable v-on:row-click="cargoOpenDetals" selectionMode="single" stripedRows :value="cargos" paginator :rows="5" sortMode="multiple" :rowsPerPageOptions="[5, 10, 20, 50]" tableStyle="min-width: 50rem">
                     <template #header>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="text-xl font-bold">Список грузов</span>
-                            <Button icon="pi pi-refresh" @click="subminForm" rounded raised />
+                            <Button icon="pi pi-refresh" @click="submitForm" rounded raised />
                         </div>
                     </template>
                     <Column field="id" header="Код" sortable> </Column>
@@ -243,7 +257,7 @@ const submitForm = () => {
             </div>
         </div>
 
-        <Dialog v-model:visible="visible" maximizable modal header="Header" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
+        <Dialog v-model:visible="visible" maximizable modal header="Детали груза" :style="{ width: '50rem' }" :breakpoints="{ '1199px': '75vw', '575px': '90vw' }">
             <p class="m-0">
                 {{ cargoView }}
             </p>
