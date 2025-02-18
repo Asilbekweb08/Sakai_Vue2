@@ -9,10 +9,7 @@ import { onMounted, ref } from 'vue';
 import * as ol from 'ol';
 import 'ol/ol.css';
 import { Style, Icon } from 'ol/style';  // Style va Icon import qilish
-
 import GeoJSON from 'ol/format/GeoJSON';  // GeoJSON formatini OpenLayersdan import qilish
-
-// OpenLayersning qolgan qismlarini import qilish
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
@@ -34,6 +31,8 @@ const visible = ref(false);
 const cargoView = ref(null);
 
 const userCoordinates = ref([0, 0]);
+let map = ref(null);  // xarita obyekti uchun o'zgaruvchi
+let vectorSource = ref(null);  // vectorSource ni global o'zgaruvchi sifatida aniqlash
 
 onMounted(() => {
     NodeService.getTypeBodyNodes().then((data) => (selectedTypeBodyNodes.value = data));
@@ -54,16 +53,15 @@ onMounted(() => {
 
 // Xaritani boshlash
 function initializeMap(coordinates) {
-    const map = new Map({
+    vectorSource.value = new VectorSource();  // vectorSource ni bu yerda aniqladik
+    map.value = new Map({
         target: 'mapContainer',
         layers: [
             new TileLayer({
                 source: new OSM(),
             }),
             new VectorLayer({
-                source: new VectorSource({
-                    features: [],
-                }),
+                source: vectorSource.value,  // vectorSource ni to'g'ri ishlatish
             }),
         ],
         view: new View({
@@ -72,14 +70,8 @@ function initializeMap(coordinates) {
         }),
     });
 
-    let vectorSource = new VectorSource();
-    map.addLayer(new VectorLayer({
-        source: vectorSource,
-    }));
-
-    loadGeoJSON(vectorSource);  // GeoJSON'ni xaritaga yuklash
+    loadGeoJSON(vectorSource.value, map.value);  // GeoJSON'ni xaritaga yuklash
 }
-
 
 // Reverse geocoding the coordinates
 function reverseGeocode(coordinates) {
@@ -121,13 +113,12 @@ function subminForm(event) {
             cargos.value = response.data;
 
             // **GeoJSON'dan yangi ma'lumotlarni yuklash va xaritani yangilash**
-            loadGeoJSON(vectorSource, map);
+            loadGeoJSON(vectorSource.value, map.value);
         })
         .catch(function (error) {
             console.log(error);
         });
 }
-
 
 // Function to load GeoJSON data and add it to map
 function loadGeoJSON(vectorSource, map) {
@@ -166,17 +157,13 @@ function loadGeoJSON(vectorSource, map) {
                     }
                 });
 
-                // Yangi koordinatalar asosida xarita zoom'ini moslashtirish
+                // Faqat zoom darajasini o'zgartiramiz, boundingExtentni olib tashladik
                 if (allCoordinates.length > 0) {
                     try {
-                        const extent = ol.extent.boundingExtent(allCoordinates);
-                        if (extent && extent[0] !== extent[2] && extent[1] !== extent[3]) {
-                            map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 15 });
-                        } else {
-                            console.error('Bounding extent calculation failed. Invalid coordinates.');
-                        }
+                        // Zoom darajasini statik qiymatga sozlash (masalan 12)
+                        map.getView().setZoom(12);  // Bu yerda kerakli zoom darajasini o'rnating
                     } catch (error) {
-                        console.error('Error calculating bounding extent:', error);
+                        console.error('Zoom update error:', error);
                     }
                 }
 
@@ -188,14 +175,8 @@ function loadGeoJSON(vectorSource, map) {
         });
 }
 
-
-
-
-
-
-
-
 </script>
+
 
 
 
@@ -211,21 +192,21 @@ function loadGeoJSON(vectorSource, map) {
           </div>
           <div class="flex flex-col md:flex-row gap-4">
             <div class="flex flex-wrap gap-2 w-full">
-              <label for="filter_start_point_location">Откуда</label>
-              <AutoComplete
-                required
-                :delay="700"
-                :forceSelection="true"
-                v-model="filter_start_point_location"
-                optionLabel="label"
-                :suggestions="filter_start_point_suggestions"
-                @complete="filter_start_point_search($event)"
-                placeholder="Введите название населенного пункта"
-                class="w-full"
-                emptySearchMessage="Ничего не найдено."
-                @option-select="subminForm"
-              />
-            </div>
+    <label for="filter_start_point_location">Откуда</label>
+    <AutoComplete
+      required
+      :delay="700"
+      :forceSelection="true"
+      v-model="filter_start_point_location"
+      optionLabel="label"
+      :suggestions="filter_start_point_suggestions"
+      @complete="filter_start_point_search($event)"
+      placeholder="Введите название населенного пункта"
+      class="w-full"
+      emptySearchMessage="Ничего не найдено."
+      @option-select="subminForm"
+    />
+  </div>
             <div class="flex flex-wrap gap-2 w-full">
               <label for="filter_finish_point_location">Куда</label>
               <AutoComplete
