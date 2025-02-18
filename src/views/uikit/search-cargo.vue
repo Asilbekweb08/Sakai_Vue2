@@ -151,7 +151,7 @@ function subminForm(event) {
 
 // Function to load GeoJSON and add it to the map
 function loadGeoJSON(vectorSource) {
-    axios.get(host + '/api/search/cargos')  // Replace with your actual GeoJSON file API endpoint
+    axios.post(host + '/api/search/cargos')  // Replace with your actual GeoJSON file API endpoint
         .then(response => {
             if (response.data) {
                 const geojsonFormat = new ol.format.GeoJSON();
