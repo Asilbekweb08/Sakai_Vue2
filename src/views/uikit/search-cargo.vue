@@ -96,22 +96,21 @@ function reverseGeocode(coordinates) {
 }
 
 // Function to submit form data
-function subminForm(event) {
+function submitForm(event) {
     let form = {
         filter_start_point_location: filter_start_point_location.value,
         filter_finish_point_location: filter_finish_point_location.value,
         selectedTypeBodyNode: selectedTypeBodyNode.value,
         calendarValue: calendarValue.value,
         selectADR: selectADR.value,
+        user_coordinates: userCoordinates.value,
     };
 
-    console.log(JSON.stringify(form));
+    console.log('Form ma\'lumotlari:', JSON.stringify(form));
 
     const headers = {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, PUT, PATCH, GET, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Origin, X-Api-Key, X-Requested-With, Content-Type, Accept, Authorization',
     };
 
     axios
@@ -120,11 +119,15 @@ function subminForm(event) {
             console.log(response.data);
             cargos.value = [];
             cargos.value = response.data;
+
+            // **GeoJSON'dan yangi ma'lumotlarni yuklash va xaritani yangilash**
+            loadGeoJSON(vectorSource, map);
         })
         .catch(function (error) {
             console.log(error);
         });
 }
+
 
 // Function to load GeoJSON data and add it to map
 function loadGeoJSON(vectorSource, map) {
@@ -136,41 +139,37 @@ function loadGeoJSON(vectorSource, map) {
                     featureProjection: 'EPSG:3857',  // Xarita proyeksiyasini moslashtirish
                 });
 
+                vectorSource.clear(); // **ESKI MARKERLARNI TOZALAYMIZ**
+
                 const allCoordinates = [];  // Koordinatalar ro'yxatini yaratish
 
                 // GeoJSON'dan olingan har bir feature uchun markerlar qo'shish
                 features.forEach(feature => {
                     const geometry = feature.getGeometry();
                     if (geometry) {
-                        const coordinates = geometry.getCoordinates();  // Koordinatalarni olish
+                        const coordinates = geometry.getCoordinates();
                         if (coordinates) {
-                            // Koordinatalarni to'g'ri proyeksiyaga o'tkazish
-                            const projectedCoordinates = fromLonLat(coordinates);  // Koordinatalarni o'zgartirish
+                            const projectedCoordinates = fromLonLat(coordinates);
 
-                            // Marker uslubini yaratish
                             const markerStyle = new Style({
                                 image: new Icon({
-                                    src: '/marker.svg',  // Marker ikonkasi
-                                    scale: 0.04,  // O'lchamini kattalashtirish
+                                    src: '/marker.svg',
+                                    scale: 0.04,
                                 }),
                             });
 
-                            feature.setStyle(markerStyle);  // Marker uslubini belgilash
-                            vectorSource.addFeature(feature);  // Feature qo'shish
+                            feature.setStyle(markerStyle);
+                            vectorSource.addFeature(feature); // **Yangi markerlarni qo‘shish**
 
-                            // Xarita uchun barcha koordinatalarni saqlash
                             allCoordinates.push(projectedCoordinates);
                         }
                     }
                 });
 
-                // Koordinatalar mavjudligini tekshirish
+                // Yangi koordinatalar asosida xarita zoom'ini moslashtirish
                 if (allCoordinates.length > 0) {
                     try {
-                        // Xarita markerlariga qarab yaqinlashtirish
-                        const extent = ol.extent.boundingExtent(allCoordinates);  // Koordinatalardan bounding box hosil qilish
-
-                        // Tekshirish: boundingExtent faqat haqiqiy koordinatalar bilan ishlaydi
+                        const extent = ol.extent.boundingExtent(allCoordinates);
                         if (extent && extent[0] !== extent[2] && extent[1] !== extent[3]) {
                             map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 15 });
                         } else {
@@ -181,13 +180,14 @@ function loadGeoJSON(vectorSource, map) {
                     }
                 }
 
-                console.log('GeoJSON successfully loaded and added to map:', response.data);
+                console.log('GeoJSON successfully loaded and updated on map:', response.data);
             }
         })
         .catch(error => {
             console.error("Error loading GeoJSON:", error);
         });
 }
+
 
 
 
