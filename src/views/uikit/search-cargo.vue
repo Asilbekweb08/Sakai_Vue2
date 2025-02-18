@@ -8,6 +8,11 @@ import Dialog from 'primevue/dialog';
 import { onMounted, ref } from 'vue';
 import * as ol from 'ol';
 import 'ol/ol.css';
+import { Style, Icon } from 'ol/style';  // Style va Icon import qilish
+
+import GeoJSON from 'ol/format/GeoJSON';  // GeoJSON formatini OpenLayersdan import qilish
+
+// OpenLayersning qolgan qismlarini import qilish
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
@@ -17,8 +22,6 @@ import Point from 'ol/geom/Point';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import * as olStyle from 'ol/style';
-import { DragBox } from 'ol/interaction';
-import { Translate } from 'ol/interaction';
 
 const host = 'http://127.0.0.1';
 const calendarValue = ref(null);
@@ -49,6 +52,7 @@ onMounted(() => {
     }
 });
 
+// Xaritani boshlash
 function initializeMap(coordinates) {
     const map = new Map({
         target: 'mapContainer',
@@ -64,48 +68,20 @@ function initializeMap(coordinates) {
         ],
         view: new View({
             center: fromLonLat(coordinates),
-            zoom: 10,
+            zoom: 1,
         }),
     });
 
     let vectorSource = new VectorSource();
-    let marker = new Feature({
-        geometry: new Point(fromLonLat(coordinates)),
-    });
-
-    marker.setStyle(
-        new olStyle.Style({
-            image: new olStyle.Icon({
-                src: '/marker.svg',
-                scale: 0.05, 
-            }),
-        })
-    );
-
-    vectorSource.addFeature(marker);
-
-    const vectorLayer = new VectorLayer({
+    map.addLayer(new VectorLayer({
         source: vectorSource,
-    });
+    }));
 
-    map.addLayer(vectorLayer);
-
-    map.on('click', function (event) {
-        const clickedCoordinates = event.coordinate;
-        const newCoordinates = toLonLat(clickedCoordinates);
-
-        marker.setGeometry(new Point(clickedCoordinates));
-        reverseGeocode(newCoordinates);
-
-        map.getView().setCenter(clickedCoordinates);
-        map.getView().setZoom(15);
-    });
-
-    // Call loadGeoJSON to add features from GeoJSON
-    loadGeoJSON(vectorSource);
+    loadGeoJSON(vectorSource);  // GeoJSON'ni xaritaga yuklash
 }
 
-// Function to reverse geocode the coordinates to an address
+
+// Reverse geocoding the coordinates
 function reverseGeocode(coordinates) {
     axios
         .get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coordinates[1]}&lon=${coordinates[0]}`)
@@ -119,6 +95,7 @@ function reverseGeocode(coordinates) {
         });
 }
 
+// Function to submit form data
 function subminForm(event) {
     let form = {
         filter_start_point_location: filter_start_point_location.value,
@@ -138,7 +115,7 @@ function subminForm(event) {
     };
 
     axios
-        .post(host + '/api/search/cargos', JSON.stringify(form), { headers })
+        .post("/public/demo/data/geo.json", JSON.stringify(form), { headers })
         .then(function (response) {
             console.log(response.data);
             cargos.value = [];
@@ -149,35 +126,78 @@ function subminForm(event) {
         });
 }
 
-// Function to load GeoJSON and add it to the map
-function loadGeoJSON(vectorSource) {
-    axios.post(host + '/api/search/cargos')  // Replace with your actual GeoJSON file API endpoint
+// Function to load GeoJSON data and add it to map
+function loadGeoJSON(vectorSource, map) {
+    axios.get('/public/demo/data/geo.json')  // GeoJSON faylini olish
         .then(response => {
             if (response.data) {
-                const geojsonFormat = new ol.format.GeoJSON();
+                const geojsonFormat = new GeoJSON();  // GeoJSON formatini yaratish
                 const features = geojsonFormat.readFeatures(response.data, {
-                    featureProjection: 'EPSG:3857',  // Ensure correct map projection
+                    featureProjection: 'EPSG:3857',  // Xarita proyeksiyasini moslashtirish
                 });
 
+                const allCoordinates = [];  // Koordinatalar ro'yxatini yaratish
+
+                // GeoJSON'dan olingan har bir feature uchun markerlar qo'shish
                 features.forEach(feature => {
-                    const markerStyle = new olStyle.Style({
-                        image: new olStyle.Icon({
-                            src: '/marker.svg',  // Marker icon
-                            scale: 0.05,  // Adjust scale
-                        }),
-                    });
-                    feature.setStyle(markerStyle);
-                    vectorSource.addFeature(feature);
+                    const geometry = feature.getGeometry();
+                    if (geometry) {
+                        const coordinates = geometry.getCoordinates();  // Koordinatalarni olish
+                        if (coordinates) {
+                            // Koordinatalarni to'g'ri proyeksiyaga o'tkazish
+                            const projectedCoordinates = fromLonLat(coordinates);  // Koordinatalarni o'zgartirish
+
+                            // Marker uslubini yaratish
+                            const markerStyle = new Style({
+                                image: new Icon({
+                                    src: '/marker.svg',  // Marker ikonkasi
+                                    scale: 0.04,  // O'lchamini kattalashtirish
+                                }),
+                            });
+
+                            feature.setStyle(markerStyle);  // Marker uslubini belgilash
+                            vectorSource.addFeature(feature);  // Feature qo'shish
+
+                            // Xarita uchun barcha koordinatalarni saqlash
+                            allCoordinates.push(projectedCoordinates);
+                        }
+                    }
                 });
 
-                console.log('GeoJSON data loaded and added to map');
+                // Koordinatalar mavjudligini tekshirish
+                if (allCoordinates.length > 0) {
+                    try {
+                        // Xarita markerlariga qarab yaqinlashtirish
+                        const extent = ol.extent.boundingExtent(allCoordinates);  // Koordinatalardan bounding box hosil qilish
+
+                        // Tekshirish: boundingExtent faqat haqiqiy koordinatalar bilan ishlaydi
+                        if (extent && extent[0] !== extent[2] && extent[1] !== extent[3]) {
+                            map.getView().fit(extent, { padding: [50, 50, 50, 50], maxZoom: 15 });
+                        } else {
+                            console.error('Bounding extent calculation failed. Invalid coordinates.');
+                        }
+                    } catch (error) {
+                        console.error('Error calculating bounding extent:', error);
+                    }
+                }
+
+                console.log('GeoJSON successfully loaded and added to map:', response.data);
             }
         })
         .catch(error => {
             console.error("Error loading GeoJSON:", error);
         });
 }
+
+
+
+
+
+
+
 </script>
+
+
 
 
 
