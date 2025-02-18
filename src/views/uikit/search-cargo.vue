@@ -96,7 +96,7 @@ function reverseGeocode(coordinates) {
 }
 
 // Function to submit form data
-function submitForm(event) {
+function subminForm(event) {
     let form = {
         filter_start_point_location: filter_start_point_location.value,
         filter_finish_point_location: filter_finish_point_location.value,
