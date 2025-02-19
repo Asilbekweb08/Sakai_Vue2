@@ -8,6 +8,7 @@ import Dialog from 'primevue/dialog';
 import { onMounted, ref } from 'vue';
 import * as ol from 'ol';
 import 'ol/ol.css';
+import Overlay from 'ol/Overlay';
 import { Style, Icon } from 'ol/style';  // Style va Icon import qilish
 import GeoJSON from 'ol/format/GeoJSON';  // GeoJSON formatini OpenLayersdan import qilish
 import { Map, View } from 'ol';
@@ -29,7 +30,7 @@ const selectADR = ref(null);
 const cargos = ref();
 const visible = ref(false);
 const cargoView = ref(null);
-
+let popup = ref(null);
 const userCoordinates = ref([0, 0]);
 let map = ref(null);  // xarita obyekti uchun o'zgaruvchi
 let vectorSource = ref(null);  // vectorSource ni global o'zgaruvchi sifatida aniqlash
@@ -52,8 +53,15 @@ onMounted(() => {
 });
 
 // Xaritani boshlash
+
 function initializeMap(coordinates) {
-    vectorSource.value = new VectorSource();  // vectorSource ni bu yerda aniqladik
+    vectorSource.value = new VectorSource();
+    popup.value = new Overlay({
+        element: document.getElementById('popup'),
+        positioning: 'bottom-center',
+        stopEvent: false,
+    });
+    
     map.value = new Map({
         target: 'mapContainer',
         layers: [
@@ -61,16 +69,33 @@ function initializeMap(coordinates) {
                 source: new OSM(),
             }),
             new VectorLayer({
-                source: vectorSource.value,  // vectorSource ni to'g'ri ishlatish
+                source: vectorSource.value,
             }),
         ],
+        overlays: [popup.value],
         view: new View({
             center: fromLonLat(coordinates),
-            zoom: 1,
+            zoom: 10,
         }),
     });
 
-    loadGeoJSON(vectorSource.value, map.value);  // GeoJSON'ni xaritaga yuklash
+    loadGeoJSON(vectorSource.value, map.value);
+
+    map.value.on('click', (event) => {
+        const feature = map.value.forEachFeatureAtPixel(event.pixel, (feature) => feature);
+        if (feature) {
+            const properties = feature.getProperties();
+            const coordinates = feature.getGeometry().getCoordinates();
+            const popupContent = `<b>${properties.title || 'No Title'}</b><br>${properties.desc || 'No Description'}`;
+            const popupElement = document.getElementById('popup-content');
+            if (popupElement) {
+                popupElement.innerHTML = popupContent;
+                popup.value.setPosition(coordinates);
+            }
+        } else {
+            popup.value.setPosition(undefined);
+        }
+    });
 }
 
 // Reverse geocoding the coordinates
@@ -122,59 +147,32 @@ function subminForm(event) {
 
 // Function to load GeoJSON data and add it to map
 function loadGeoJSON(vectorSource, map) {
-    axios.get('/public/demo/data/geo.json')  // GeoJSON faylini olish
+    axios.get('/public/demo/data/geo.json')
         .then(response => {
             if (response.data) {
-                const geojsonFormat = new GeoJSON();  // GeoJSON formatini yaratish
+                const geojsonFormat = new GeoJSON();
                 const features = geojsonFormat.readFeatures(response.data, {
-                    featureProjection: 'EPSG:3857',  // Xarita proyeksiyasini moslashtirish
+                    featureProjection: 'EPSG:3857',
                 });
-
-                vectorSource.clear(); // **ESKI MARKERLARNI TOZALAYMIZ**
-
-                const allCoordinates = [];  // Koordinatalar ro'yxatini yaratish
-
-                // GeoJSON'dan olingan har bir feature uchun markerlar qo'shish
+                
+                vectorSource.clear();
+                
                 features.forEach(feature => {
-                    const geometry = feature.getGeometry();
-                    if (geometry) {
-                        const coordinates = geometry.getCoordinates();
-                        if (coordinates) {
-                            const projectedCoordinates = fromLonLat(coordinates);
-
-                            const markerStyle = new Style({
-                                image: new Icon({
-                                    src: '/marker.svg',
-                                    scale: 0.04,
-                                }),
-                            });
-
-                            feature.setStyle(markerStyle);
-                            vectorSource.addFeature(feature); // **Yangi markerlarni qo‘shish**
-
-                            allCoordinates.push(projectedCoordinates);
-                        }
-                    }
+                    const markerStyle = new Style({
+                        image: new Icon({
+                            src: '/marker.svg',
+                            scale: 0.04,
+                        }),
+                    });
+                    feature.setStyle(markerStyle);
+                    vectorSource.addFeature(feature);
                 });
-
-                // Faqat zoom darajasini o'zgartiramiz, boundingExtentni olib tashladik
-                if (allCoordinates.length > 0) {
-                    try {
-                        // Zoom darajasini statik qiymatga sozlash (masalan 12)
-                        map.getView().setZoom(12);  // Bu yerda kerakli zoom darajasini o'rnating
-                    } catch (error) {
-                        console.error('Zoom update error:', error);
-                    }
-                }
-
-                console.log('GeoJSON successfully loaded and updated on map:', response.data);
             }
         })
         .catch(error => {
             console.error("Error loading GeoJSON:", error);
         });
 }
-
 </script>
 
 
@@ -189,6 +187,9 @@ function loadGeoJSON(vectorSource, map) {
           <div class="font-semibold text-xl">Поиск грузов</div>
           <div class="flex flex-col md:flex-row gap-4">
             <div id="mapContainer" style="height: 400px; width: 100%"></div>
+            <div id="popup" class="ol-popup">
+    <div id="popup-content"></div>
+</div>
           </div>
           <div class="flex flex-col md:flex-row gap-4">
             <div class="flex flex-wrap gap-2 w-full">
@@ -329,4 +330,34 @@ function loadGeoJSON(vectorSource, map) {
     height: 400px;
     width: 100%;
 }
+.ol-popup {
+    position: absolute;
+    background-color: white;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    min-width: 150px;
+    max-width: 250px;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+}
+
+.ol-popup:after {
+    content: "";
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    margin-left: -10px;
+    border-width: 10px;
+    border-style: solid;
+    border-color: white transparent transparent transparent;
+}
+
+.ol-popup-content {
+    margin: 0;
+    padding: 5px;
+}
+
 </style>

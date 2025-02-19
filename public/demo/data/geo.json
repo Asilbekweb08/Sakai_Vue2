@@ -1,35 +1,49 @@
 {
     "type": "FeatureCollection",
     "features": [
-        {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [102.0, 0.5]
-            },
-            "properties": {
-                "name": "Marker 1"
-            }
+      {
+        "type": "Feature",
+        "properties": {
+          "title": "Заголовок 2",
+          "desc": "Описание два"
         },
-        {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [103.0, 1.5]
-            },
-            "properties": {
-                "name": "Point"
-            }
-        },
-        {
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [102.0, 1.5]
-            },
-            "properties": {
-                "name": "Point"
-            }
+        "geometry": {
+          "coordinates": [
+            37.657699984984845,
+            55.731808247075946
+          ],
+          "type": "Point"
         }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "title": "Заголовок 3",
+          "desc": "Описание три"
+        },
+        "geometry": {
+          "coordinates": [
+            37.66790048807812,
+            55.68530951581789
+          ],
+          "type": "Point"
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": {
+          "title": "Заголовок 1",
+          "desc": "Описание один"
+        },
+        "geometry": {
+          "coordinates": [
+            37.83904486347734,
+            55.729505423179205
+          ],
+          "type": "Point"
+        },
+        "id": 2
+      }
     ]
-}
+  }
+  
